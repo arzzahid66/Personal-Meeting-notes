@@ -127,6 +127,44 @@ export function useUpdateMeeting(id: UUID) {
   });
 }
 
+/**
+ * Deleting a transcript or a note changes the meeting's whole shape — status is
+ * rewound, and the pipeline panel keys off it — so the detail and the status
+ * poll are both refreshed.
+ */
+function useMeetingContentMutation<V>(
+  meetingId: UUID,
+  mutationFn: (value: V) => Promise<void>,
+) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, V>({
+    mutationFn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.meeting(meetingId) });
+      void qc.invalidateQueries({ queryKey: qk.meetingStatus(meetingId) });
+      void qc.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+}
+
+export function useDeleteTranscript(meetingId: UUID) {
+  return useMeetingContentMutation<void>(meetingId, () =>
+    meetingsApi.deleteTranscript(meetingId),
+  );
+}
+
+export function useDeleteNote(meetingId: UUID) {
+  return useMeetingContentMutation<UUID>(meetingId, (noteId) =>
+    meetingsApi.deleteNote(meetingId, noteId),
+  );
+}
+
+export function useDeleteAllNotes(meetingId: UUID) {
+  return useMeetingContentMutation<void>(meetingId, () =>
+    meetingsApi.deleteAllNotes(meetingId),
+  );
+}
+
 export function useDeleteMeeting() {
   const qc = useQueryClient();
   return useMutation<void, Error, UUID>({

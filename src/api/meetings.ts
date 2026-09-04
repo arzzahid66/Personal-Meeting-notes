@@ -63,6 +63,25 @@ export const meetingsApi = {
     });
   },
 
+  /**
+   * Drops the transcript and its chunk rows so the meeting can be transcribed
+   * again from scratch. The server rewinds status to `uploaded` while the audio
+   * is still on hand, otherwise to `draft`.
+   */
+  deleteTranscript(id: UUID) {
+    return apiFetch<void>(`/meetings/${id}/transcript`, { method: "DELETE" });
+  },
+
+  /** Removes one generated note. Tasks are shared across generations and stay. */
+  deleteNote(id: UUID, noteId: UUID) {
+    return apiFetch<void>(`/meetings/${id}/notes/${noteId}`, { method: "DELETE" });
+  },
+
+  /** Clears every note for a clean re-generate. Idempotent, and leaves tasks. */
+  deleteAllNotes(id: UUID) {
+    return apiFetch<void>(`/meetings/${id}/notes`, { method: "DELETE" });
+  },
+
   /** 404 once the original audio has been deleted post-transcription. */
   audioUrl(id: UUID) {
     return apiFetch<AudioUrlResponse>(`/meetings/${id}/audio/url`);

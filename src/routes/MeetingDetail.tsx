@@ -17,7 +17,10 @@ import { ACCEPTED_EXTENSIONS, isAcceptedFilename } from "@/api/upload";
 import type { MeetingDetail, OutputLanguage } from "@/api/types";
 import {
   qk,
+  useDeleteAllNotes,
   useDeleteMeeting,
+  useDeleteNote,
+  useDeleteTranscript,
   useMeeting,
   useProject,
   useUpdateMeeting,
@@ -192,14 +195,21 @@ export default function MeetingDetailScreen() {
                 {meeting.notes.map((note) => (
                   <Card key={note.id}>
                     <CardContent className="space-y-4 pt-4">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span className="font-medium uppercase tracking-wide">
                           {note.output_language === "ur" ? "اردو" : "English"}
                         </span>
-                        <span>
-                          {note.llm_provider}
-                          {note.model ? ` · ${note.model}` : ""}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span>
+                            {note.llm_provider}
+                            {note.model ? ` · ${note.model}` : ""}
+                          </span>
+                          <DeleteNoteButton
+                            meetingId={meeting.id}
+                            noteId={note.id}
+                            language={note.output_language}
+                          />
+                        </div>
                       </div>
 
                       {note.summary ? (
@@ -213,6 +223,15 @@ export default function MeetingDetailScreen() {
                     </CardContent>
                   </Card>
                 ))}
+
+                {/* Notes accumulate one per generation, so clearing the lot is
+                    worth offering once there is more than one. */}
+                {meeting.notes.length > 1 ? (
+                  <ClearAllNotesButton
+                    meetingId={meeting.id}
+                    count={meeting.notes.length}
+                  />
+                ) : null}
               </div>
             )}
           </TabsContent>
@@ -242,12 +261,13 @@ export default function MeetingDetailScreen() {
                   {/* POST /transcript overwrites whatever is there, so a bad
                       transcription can be corrected without re-recording.
                       There is no endpoint to remove one outright. */}
-                  <div className="border-t pt-3">
+                  <div className="flex flex-wrap gap-2 border-t pt-3">
                     <PasteTranscriptDialog
                       meetingId={meeting.id}
                       replacing
                       existingLanguage={meeting.transcript.language}
                     />
+                    <DeleteTranscriptButton meetingId={meeting.id} />
                   </div>
                 </CardContent>
               </Card>
@@ -415,6 +435,135 @@ function AudioSourcePanel({ meeting }: { meeting: MeetingDetail }) {
         />
       </CardContent>
     </Card>
+  );
+}
+
+/* ------------------------------------------------ deleting generated work --- */
+
+function DeleteNoteButton({
+  meetingId,
+  noteId,
+  language,
+}: {
+  meetingId: string;
+  noteId: string;
+  language: OutputLanguage;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const remove = useDeleteNote(meetingId);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground"
+        aria-label={`Delete the ${language === "ur" ? "Urdu" : "English"} note`}
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 />
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Delete this note?"
+        description="The tasks stay — they are extracted once and shared across every generation, so removing a note does not take them with it."
+        confirmLabel="Delete note"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() =>
+          remove.mutate(noteId, {
+            onSuccess: () => {
+              setOpen(false);
+              toast.success("Note deleted.");
+            },
+            onError: (err) => toast.error(err.message),
+          })
+        }
+      />
+    </>
+  );
+}
+
+function ClearAllNotesButton({
+  meetingId,
+  count,
+}: {
+  meetingId: string;
+  count: number;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const clear = useDeleteAllNotes(meetingId);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full text-muted-foreground hover:text-destructive"
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 className="size-4" />
+        Clear all {count} notes
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Delete all ${count} notes?`}
+        description="Every note on this meeting is removed so you can generate again cleanly. The transcript and the tasks are untouched."
+        confirmLabel="Delete all notes"
+        destructive
+        loading={clear.isPending}
+        onConfirm={() =>
+          clear.mutate(undefined, {
+            onSuccess: () => {
+              setOpen(false);
+              toast.success("Notes cleared. Generate again when you are ready.");
+            },
+            onError: (err) => toast.error(err.message),
+          })
+        }
+      />
+    </>
+  );
+}
+
+function DeleteTranscriptButton({ meetingId }: { meetingId: string }) {
+  const [open, setOpen] = React.useState(false);
+  const remove = useDeleteTranscript(meetingId);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground hover:text-destructive"
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 className="size-4" />
+        Delete transcript
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Delete this transcript?"
+        // The server rewinds status, and which one it lands on depends on
+        // whether the audio survived transcription — so both are named.
+        description="The transcript and its chunks are removed so the meeting can be transcribed from scratch. If the audio is still stored you can transcribe again; if it was deleted after transcription, the meeting returns to a draft and needs audio again. Existing notes and tasks are left alone."
+        confirmLabel="Delete transcript"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() =>
+          remove.mutate(undefined, {
+            onSuccess: () => {
+              setOpen(false);
+              toast.success("Transcript deleted.");
+            },
+            onError: (err) => toast.error(err.message),
+          })
+        }
+      />
+    </>
   );
 }
 
