@@ -67,6 +67,10 @@ export interface RecorderResult {
   mimeType: string;
   durationMs: number;
   bytes: number;
+  /** Chunks MediaRecorder handed over — compare against what came back out. */
+  chunkCount: number;
+  /** True if any chunk failed to reach IndexedDB. */
+  incomplete: boolean;
 }
 
 const CHUNK_INTERVAL_MS = 10_000; // a crash costs at most 10 seconds
@@ -101,6 +105,9 @@ export function useRecorder() {
   const accumulated = React.useRef(0);
   const sessionRef = React.useRef<string | null>(null);
   const bytes = React.useRef(0);
+  /** Serialises chunk writes to IndexedDB; awaited before a take is assembled. */
+  const writeQueue = React.useRef<Promise<void>>(Promise.resolve());
+  const writeFailed = React.useRef(false);
 
   useWakeLock(state === "recording" || state === "paused");
 
@@ -186,6 +193,8 @@ export function useRecorder() {
         setSessionId(id);
         seq.current = 0;
         bytes.current = 0;
+        writeQueue.current = Promise.resolve();
+        writeFailed.current = false;
         accumulated.current = 0;
         startedAt.current = Date.now();
         setElapsedMs(0);
@@ -199,9 +208,24 @@ export function useRecorder() {
 
         rec.ondataavailable = (e) => {
           if (!e.data || e.data.size === 0) return;
+          const index = seq.current++;
           bytes.current += e.data.size;
+
           // Persisted as it arrives, so a suspend or crash loses one chunk.
-          void appendChunk(id, seq.current++, e.data);
+          //
+          // The writes are chained rather than fired off in parallel: each one
+          // opens a read-modify-write transaction on the session row, and
+          // overlapping transactions can drop a write. Losing chunk 0 loses the
+          // WebM header, which makes the whole recording undecodable server-side
+          // even though every other byte arrived.
+          writeQueue.current = writeQueue.current
+            .then(() => appendChunk(id, index, e.data))
+            .catch(() => {
+              writeFailed.current = true;
+              setError(
+                "This device could not save part of the recording. Stop and upload now — the audio may be incomplete.",
+              );
+            });
         };
 
         rec.onerror = () => {
@@ -254,9 +278,13 @@ export function useRecorder() {
 
     return new Promise((resolve) => {
       rec.onstop = () => {
-        // ondataavailable for the final chunk fires just before onstop; give the
-        // IndexedDB write a tick to land before the session is marked ready.
-        setTimeout(async () => {
+        void (async () => {
+          // ondataavailable for the final chunk fires just before onstop, so by
+          // now it is on the queue. Waiting for the queue to drain — rather than
+          // guessing at a timeout — is what guarantees the assembled blob holds
+          // every chunk that was recorded.
+          await writeQueue.current;
+
           const mimeType = rec.mimeType || "audio/webm";
           await patchSession(id, {
             state: "ready",
@@ -266,8 +294,15 @@ export function useRecorder() {
           teardown();
           setState("idle");
           setElapsedMs(0);
-          resolve({ sessionId: id, mimeType, durationMs, bytes: bytes.current });
-        }, 150);
+          resolve({
+            sessionId: id,
+            mimeType,
+            durationMs,
+            bytes: bytes.current,
+            chunkCount: seq.current,
+            incomplete: writeFailed.current,
+          });
+        })();
       };
       rec.stop();
     });

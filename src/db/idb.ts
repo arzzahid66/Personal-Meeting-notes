@@ -159,18 +159,46 @@ export async function appendChunk(
   await tx.done;
 }
 
-/** Reassemble a session's chunks, in order, into one Blob for upload. */
+/**
+ * Reassemble a session's chunks, in order, into one Blob for upload.
+ *
+ * Order matters absolutely: chunk 0 carries the container header, and the rest
+ * are continuations of that one stream. Out of order, or with a gap, the result
+ * is bytes no decoder will accept.
+ */
 export async function assembleSession(
   sessionId: string,
   mimeType: string,
 ): Promise<Blob> {
+  const { blob } = await assembleSessionChecked(sessionId, mimeType);
+  return blob;
+}
+
+export interface AssembledSession {
+  blob: Blob;
+  /** Chunks actually found on disk, and the highest sequence number seen. */
+  chunkCount: number;
+  /** True if a sequence number between 0 and the highest is missing. */
+  hasGap: boolean;
+}
+
+export async function assembleSessionChecked(
+  sessionId: string,
+  mimeType: string,
+): Promise<AssembledSession> {
   const rows = await (await db())
     .getAllFromIndex("chunks", "by_session", sessionId);
   rows.sort((a, b) => a.seq - b.seq);
-  return new Blob(
-    rows.map((r) => r.blob),
-    { type: mimeType },
-  );
+
+  const highest = rows.length > 0 ? rows[rows.length - 1].seq : -1;
+  return {
+    blob: new Blob(
+      rows.map((r) => r.blob),
+      { type: mimeType },
+    ),
+    chunkCount: rows.length,
+    hasGap: rows.length !== highest + 1,
+  };
 }
 
 function chunkKey(sessionId: string, seq: number) {

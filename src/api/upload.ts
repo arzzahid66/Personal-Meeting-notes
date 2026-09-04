@@ -65,6 +65,18 @@ export function extensionFor(mimeType: string): string {
   return map[base] ?? ".webm";
 }
 
+/**
+ * "audio/webm;codecs=opus" -> "audio/webm".
+ *
+ * MediaRecorder reports the codec parameter, but the presign contract expects a
+ * plain type ("audio/webm"), and whatever goes in has to come back out as the
+ * PUT's Content-Type for the signature to verify. Sending the bare type keeps
+ * both ends agreeing on one string.
+ */
+export function baseMimeType(type: string): string {
+  return type.split(";")[0].trim().toLowerCase();
+}
+
 export function isAcceptedFilename(name: string): boolean {
   const dot = name.lastIndexOf(".");
   if (dot < 0) return false;
@@ -212,7 +224,13 @@ export async function uploadAudio(
   try {
     presign = await apiFetch<PresignResponse>(
       `/meetings/${meetingId}/audio/presign`,
-      { method: "POST", body: { filename, content_type: blob.type || undefined } },
+      {
+        method: "POST",
+        body: {
+          filename,
+          content_type: blob.type ? baseMimeType(blob.type) : undefined,
+        },
+      },
     );
   } catch (err) {
     // Object storage is off server-side: multipart is the documented fallback.

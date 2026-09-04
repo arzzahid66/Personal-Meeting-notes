@@ -19,6 +19,7 @@ import {
 } from "@/api/upload";
 import {
   assembleSession,
+  assembleSessionChecked,
   deleteSession,
   getSession,
   listUnfinishedSessions,
@@ -167,6 +168,41 @@ export default function RecordScreen() {
         lastError: upload.error,
       });
     }
+  }
+
+  /** Stop the take and move it into the upload pane. */
+  async function finishRecording() {
+    const result = await recorder.stop();
+    // Fall back to whatever is on disk: the audio is written chunk by chunk, so
+    // a take is never lost just because the stop handshake returned nothing.
+    const sessionId = result?.sessionId ?? recorder.sessionId;
+    const session =
+      (sessionId ? await getSession(sessionId) : undefined) ??
+      (await listUnfinishedSessions())[0];
+
+    if (!session) {
+      toast.error("The recording could not be read back from this device.");
+      return;
+    }
+
+    const assembled = await assembleSessionChecked(
+      session.id,
+      result?.mimeType ?? session.mimeType,
+    );
+
+    // Catch a damaged take here rather than after a round trip to Cloudflare
+    // and a 415 from the server. A gap — or a missing chunk 0 — means the
+    // container header or a cluster is absent and nothing can decode it.
+    if (assembled.chunkCount === 0 || assembled.hasGap || result?.incomplete) {
+      setPending(null);
+      setFileError(
+        "Part of this recording did not save to this device, so it cannot be played back or transcribed. Please record it again.",
+      );
+      return;
+    }
+
+    setPending({ session, blob: assembled.blob });
+    setSearch({}, { replace: true });
   }
 
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -387,17 +423,7 @@ export default function RecordScreen() {
                 type="button"
                 onClick={() => {
                   if (busyRecording) {
-                    void recorder.stop().then(async (result) => {
-                      if (!result) return;
-                      const session = await getSession(result.sessionId);
-                      if (!session) return;
-                      const blob = await assembleSession(
-                        result.sessionId,
-                        result.mimeType,
-                      );
-                      setPending({ session, blob });
-                      setSearch({}, { replace: true });
-                    });
+                    void finishRecording();
                   } else {
                     void recorder.start({
                       id: meetingParam,
@@ -434,7 +460,7 @@ export default function RecordScreen() {
                   : recorder.state === "recording"
                     ? "Recording — saved to this device every 10 seconds"
                     : recorder.state === "paused"
-                      ? "Paused"
+                      ? "Paused — stop when you are done to upload it"
                       : recorder.state === "stopping"
                         ? "Finishing…"
                         : loadingPending
@@ -461,11 +487,25 @@ export default function RecordScreen() {
               </div>
             ) : null}
 
-            <div className="flex gap-2">
-              {busyRecording ? (
-                <>
+            {busyRecording ? (
+              <div className="w-full max-w-sm space-y-2">
+                {/* The finishing action is spelled out rather than left to the
+                    icon on the circle — Pause and Discard being the only
+                    labelled controls reads as having no way to finish. */}
+                <Button
+                  size="lg"
+                  className="w-full"
+                  loading={recorder.state === "stopping"}
+                  onClick={() => void finishRecording()}
+                >
+                  <CircleStop className="size-5" />
+                  Stop &amp; upload
+                </Button>
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
+                    className="flex-1"
+                    disabled={recorder.state === "stopping"}
                     onClick={() =>
                       recorder.state === "paused"
                         ? recorder.resume()
@@ -484,18 +524,23 @@ export default function RecordScreen() {
                       </>
                     )}
                   </Button>
-                  <Button variant="ghost" onClick={() => setConfirmDiscard(true)}>
+                  <Button
+                    variant="ghost"
+                    className="flex-1 text-muted-foreground"
+                    disabled={recorder.state === "stopping"}
+                    onClick={() => setConfirmDiscard(true)}
+                  >
                     <Trash2 className="size-4" />
                     Discard
                   </Button>
-                </>
-              ) : (
-                <Button variant="outline" onClick={() => fileInput.current?.click()}>
-                  <Upload className="size-4" />
-                  Upload a file instead
-                </Button>
-              )}
-            </div>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={() => fileInput.current?.click()}>
+                <Upload className="size-4" />
+                Upload a file instead
+              </Button>
+            )}
 
             <input
               ref={fileInput}
