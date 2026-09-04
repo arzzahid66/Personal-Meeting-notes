@@ -188,6 +188,12 @@ export interface UploadOptions {
   signal?: AbortSignal;
   /** Force the multipart path, after an explicit "upload via the server". */
   forceApiPath?: boolean;
+  /**
+   * Reports what the server decided to store, before the bytes are sent.
+   * When the server later says it cannot read the object, this is the evidence
+   * that separates a bad recording from a server that mis-stored a good one.
+   */
+  onPresigned?: (presign: PresignResponse, blob: Blob) => void;
 }
 
 /**
@@ -199,7 +205,7 @@ export async function uploadAudio(
   meetingId: UUID,
   blob: Blob,
   filename: string,
-  { onProgress, signal, forceApiPath }: UploadOptions = {},
+  { onProgress, signal, forceApiPath, onPresigned }: UploadOptions = {},
 ): Promise<Meeting> {
   if (blob.size > MAX_UPLOAD_BYTES) {
     throw new UploadError("api", "Audio exceeds the 500 MB limit.");
@@ -237,6 +243,8 @@ export async function uploadAudio(
     if (err instanceof ApiError && err.status === 501) return viaApi();
     throw err;
   }
+
+  onPresigned?.(presign, blob);
 
   // 2 — bytes straight to Cloudflare
   onProgress?.({ phase: "uploading", ratio: 0, direct: true });

@@ -394,15 +394,39 @@ export default function RecordScreen() {
                     title={upload.corsBlocked ? "Blocked before it left the browser" : undefined}
                     message={upload.error}
                     action={
-                      upload.corsBlocked ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => doUpload(true)}
-                        >
-                          Upload through the server instead
-                        </Button>
-                      ) : undefined
+                      <div className="space-y-2">
+                        {upload.corsBlocked ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => doUpload(true)}
+                          >
+                            Upload through the server instead
+                          </Button>
+                        ) : null}
+                        {/* The browser already proved this audio is playable, so
+                            if the server cannot read it, what it stored is the
+                            thing to look at. */}
+                        {upload.diagnostics ? (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-muted-foreground">
+                              Upload details
+                            </summary>
+                            <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono">
+                              <dt className="text-muted-foreground">stored as</dt>
+                              <dd className="break-all">{upload.diagnostics.key}</dd>
+                              <dt className="text-muted-foreground">signed type</dt>
+                              <dd>{upload.diagnostics.contentType}</dd>
+                              <dt className="text-muted-foreground">sent type</dt>
+                              <dd>{upload.diagnostics.sentMimeType}</dd>
+                              <dt className="text-muted-foreground">filename</dt>
+                              <dd>{upload.diagnostics.filename}</dd>
+                              <dt className="text-muted-foreground">bytes</dt>
+                              <dd>{upload.diagnostics.bytes.toLocaleString()}</dd>
+                            </dl>
+                          </details>
+                        ) : null}
+                      </div>
                     }
                   />
                 ) : null}
