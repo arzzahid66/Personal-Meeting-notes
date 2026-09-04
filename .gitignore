@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+.env
+.env.local
+.env.*.local
+*.local
+.DS_Store
+.vercel
+*.tsbuildinfo
+dev-dist
+
+# local browser-testing artefacts
+.playwright-mcp
+login*.png
