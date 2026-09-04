@@ -239,6 +239,16 @@ export default function MeetingDetailScreen() {
                   >
                     {meeting.transcript.text}
                   </p>
+                  {/* POST /transcript overwrites whatever is there, so a bad
+                      transcription can be corrected without re-recording.
+                      There is no endpoint to remove one outright. */}
+                  <div className="border-t pt-3">
+                    <PasteTranscriptDialog
+                      meetingId={meeting.id}
+                      replacing
+                      existingLanguage={meeting.transcript.language}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             ) : (
@@ -410,11 +420,19 @@ function AudioSourcePanel({ meeting }: { meeting: MeetingDetail }) {
 
 /* -------------------------------------------------- paste a transcript --- */
 
-function PasteTranscriptDialog({ meetingId }: { meetingId: string }) {
+function PasteTranscriptDialog({
+  meetingId,
+  replacing = false,
+  existingLanguage,
+}: {
+  meetingId: string;
+  replacing?: boolean;
+  existingLanguage?: string | null;
+}) {
   const qc = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [text, setText] = React.useState("");
-  const [language, setLanguage] = React.useState("en");
+  const [language, setLanguage] = React.useState(existingLanguage ?? "en");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
@@ -427,7 +445,11 @@ function PasteTranscriptDialog({ meetingId }: { meetingId: string }) {
       void qc.invalidateQueries({ queryKey: ["meetings"] });
       setOpen(false);
       setText("");
-      toast.success("Transcript saved. Generate to extract tasks.");
+      toast.success(
+        replacing
+          ? "Transcript replaced. Re-generate to rebuild the tasks from it."
+          : "Transcript saved. Generate to extract tasks.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the transcript.");
     } finally {
@@ -438,14 +460,22 @@ function PasteTranscriptDialog({ meetingId }: { meetingId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="flex-1">
-          <FileText className="size-4" />
-          Paste a transcript
+        <Button
+          variant="outline"
+          size={replacing ? "sm" : "default"}
+          className={replacing ? undefined : "flex-1"}
+        >
+          {replacing ? <Pencil className="size-4" /> : <FileText className="size-4" />}
+          {replacing ? "Replace transcript" : "Paste a transcript"}
         </Button>
       </DialogTrigger>
       <DialogContent
-        title="Paste a transcript"
-        description="For meetings typed up or transcribed elsewhere. This skips audio entirely and replaces any existing transcript."
+        title={replacing ? "Replace this transcript" : "Paste a transcript"}
+        description={
+          replacing
+            ? "Overwrites the current transcript with the text below. Existing notes stay as they are — re-generate afterwards to rebuild the tasks."
+            : "For meetings typed up or transcribed elsewhere. This skips audio entirely and replaces any existing transcript."
+        }
       >
         <div className="space-y-3">
           {error ? <ErrorNotice message={error} /> : null}
@@ -477,7 +507,7 @@ function PasteTranscriptDialog({ meetingId }: { meetingId: string }) {
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button loading={busy} disabled={!text.trim()} onClick={submit}>
-            Save transcript
+            {replacing ? "Replace transcript" : "Save transcript"}
           </Button>
         </DialogFooter>
       </DialogContent>
