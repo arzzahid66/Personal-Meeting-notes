@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { RequireAuth, RequireAnon } from "@/components/guards";
 import LoginScreen from "@/routes/Login";
 import SignupScreen from "@/routes/Signup";
@@ -16,6 +17,7 @@ import NotFoundScreen from "@/routes/NotFound";
 
 export default function App() {
   return (
+    <>
     <Routes>
       <Route element={<RequireAnon />}>
         <Route path="/login" element={<LoginScreen />} />
@@ -39,5 +41,7 @@ export default function App() {
 
       <Route path="*" element={<NotFoundScreen />} />
     </Routes>
+    <InstallPrompt />
+    </>
   );
 }

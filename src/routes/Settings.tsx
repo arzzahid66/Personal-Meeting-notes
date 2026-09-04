@@ -7,6 +7,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  Smartphone,
   Sun,
   X,
 } from "lucide-react";
@@ -29,6 +30,8 @@ import { Card, CardContent, Skeleton } from "@/components/ui/card";
 import { Field, Input, Label, Textarea } from "@/components/ui/input";
 import { SimpleSelect } from "@/components/ui/select";
 import { ErrorNotice } from "@/components/ui/misc";
+import { useInstall } from "@/hooks/useInstall";
+import { InstallDialog } from "@/components/InstallDialog";
 import { getStoredTheme, setTheme, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -366,6 +369,9 @@ export default function SettingsScreen() {
               </details>
             </section>
 
+            {/* --------------------------------------------------- install */}
+            <InstallCard />
+
             {/* ---------------------------------------------------- tokens */}
             <Card>
               <CardContent className="pt-4">
@@ -399,6 +405,62 @@ export default function SettingsScreen() {
           </Button>
         </div>
       ) : null}
+    </>
+  );
+}
+
+/**
+ * A permanent way in. The floating prompt can be dismissed, browsers stop
+ * offering the one-tap install after a while, and iOS never offers it at all —
+ * so installing has to be reachable on purpose, not only by chance.
+ */
+function InstallCard() {
+  const { standalone, canPrompt, promptInstall } = useInstall();
+  const [showSteps, setShowSteps] = React.useState(false);
+
+  if (standalone) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-3 pt-4">
+          <Check className="size-5 shrink-0 text-success" />
+          <div>
+            <p className="font-medium">Installed</p>
+            <p className="text-sm text-muted-foreground">
+              You are running the installed app.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardContent className="flex items-center justify-between gap-3 pt-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Smartphone className="size-5 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <p className="font-medium">Install on this device</p>
+              <p className="text-sm text-muted-foreground">
+                Runs full screen and records more reliably.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              if (canPrompt) await promptInstall();
+              else setShowSteps(true);
+            }}
+          >
+            Install
+          </Button>
+        </CardContent>
+      </Card>
+
+      <InstallDialog open={showSteps} onOpenChange={setShowSteps} />
     </>
   );
 }

@@ -12,7 +12,6 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/auth";
 import { useOnline } from "@/hooks/useOnline";
 import { cn } from "@/lib/utils";
-import { InstallPrompt } from "./InstallPrompt";
 import { RecoveryPrompt } from "./RecoveryPrompt";
 
 const NAV = [
@@ -60,7 +59,6 @@ export function AppShell() {
       </main>
 
       <RecoveryPrompt />
-      <InstallPrompt />
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur pb-safe">
         <ul className="mx-auto flex max-w-3xl items-stretch justify-around px-2 pt-1">
