@@ -13,3 +13,4 @@ dev-dist
 # local browser-testing artefacts
 .playwright-mcp
 login*.png
+audit

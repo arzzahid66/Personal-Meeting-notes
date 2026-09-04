@@ -128,9 +128,12 @@ export function PipelinePanel({ meeting }: { meeting: MeetingDetail }) {
               </div>
             ) : null}
 
-            <div className="flex gap-2">
+            {/* Stacked on phones: "Generate notes & tasks" cannot shrink (it is
+                nowrap), so side by side with the language select it pushed the
+                whole page into horizontal scroll at 414px. */}
+            <div className="flex flex-col gap-2 sm:flex-row">
               <SimpleSelect
-                className="w-40 shrink-0"
+                className="w-full sm:w-40 sm:shrink-0"
                 value={language}
                 onChange={(value) => setLanguage(value as OutputLanguage | "")}
                 options={[
@@ -141,7 +144,9 @@ export function PipelinePanel({ meeting }: { meeting: MeetingDetail }) {
               />
               <Button
                 size="lg"
-                className="flex-1"
+                // Not flex-1: in the stacked (column) layout that resolves to
+                // flex-basis 0 on the height and collapses the button.
+                className="w-full sm:flex-1"
                 loading={generate.isPending}
                 disabled={active}
                 onClick={() => generate.mutate()}

@@ -55,16 +55,23 @@ export function TaskCard({ task }: { task: Task }) {
                 },
               )
             }
-            className={cn(
-              "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors",
-              task.status === "done"
-                ? "border-success bg-success text-white"
-                : task.status === "in_progress"
-                  ? "border-primary text-primary"
-                  : "border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary",
-            )}
+            // The main interaction on the task board, so the hit area is sized
+            // for a thumb: 40px of tappable button around a 24px ring, with the
+            // negative margin keeping the layout identical.
+            className="-m-2 flex shrink-0 items-center justify-center p-2 disabled:opacity-50"
           >
-            <Icon className="size-3.5" />
+            <span
+              className={cn(
+                "flex size-6 items-center justify-center rounded-full border transition-colors",
+                task.status === "done"
+                  ? "border-success bg-success text-white"
+                  : task.status === "in_progress"
+                    ? "border-primary text-primary"
+                    : "border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary",
+              )}
+            >
+              <Icon className="size-3.5" />
+            </span>
           </button>
 
           <div className="min-w-0 flex-1 space-y-2">

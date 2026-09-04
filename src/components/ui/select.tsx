@@ -78,7 +78,15 @@ export function SelectItem({
   );
 }
 
-/** Convenience wrapper for the many single-value selects in this app. */
+/**
+ * Radix reserves the empty string to mean "nothing is selected", so an option
+ * declared as `{ value: "" }` — every "All projects" / "Any status" / "Project
+ * default" choice in this app — would render as the placeholder and could not
+ * be picked. The empty value is swapped for a sentinel across the Radix
+ * boundary and swapped back on the way out, so callers can keep using "".
+ */
+const EMPTY_VALUE = "__empty__";
+
 export function SimpleSelect<T extends string>({
   value,
   onChange,
@@ -98,8 +106,8 @@ export function SimpleSelect<T extends string>({
 }) {
   return (
     <Select
-      value={value ?? ""}
-      onValueChange={(v) => onChange(v as T)}
+      value={value ? value : EMPTY_VALUE}
+      onValueChange={(v) => onChange((v === EMPTY_VALUE ? "" : v) as T)}
       disabled={disabled}
     >
       <SelectTrigger className={className} id={id}>
@@ -107,7 +115,7 @@ export function SimpleSelect<T extends string>({
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
+          <SelectItem key={o.value || EMPTY_VALUE} value={o.value || EMPTY_VALUE}>
             {o.label}
           </SelectItem>
         ))}

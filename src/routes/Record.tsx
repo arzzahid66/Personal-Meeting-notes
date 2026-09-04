@@ -18,7 +18,6 @@ import {
   MAX_DURATION_MIN,
 } from "@/api/upload";
 import {
-  assembleSession,
   assembleSessionChecked,
   deleteSession,
   getSession,
@@ -37,6 +36,7 @@ import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
 import { SimpleSelect } from "@/components/ui/select";
 import { ErrorNotice, Progress } from "@/components/ui/misc";
+import { verifyAudioBlob } from "@/lib/audio";
 import { cn, formatBytes, formatDate, formatDuration, todayIso } from "@/lib/utils";
 
 type Pending = { session: RecordingSession; blob: Blob };
@@ -57,6 +57,9 @@ export default function RecordScreen() {
   const [loadingPending, setLoadingPending] = React.useState(false);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
   const [fileError, setFileError] = React.useState<string | null>(null);
+  const [badTake, setBadTake] = React.useState<
+    { session: RecordingSession; reason: string } | null
+  >(null);
   const fileInput = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -82,9 +85,11 @@ export default function RecordScreen() {
         setLoadingPending(false);
         return;
       }
-      const blob = await assembleSession(session.id, session.mimeType);
+      // Anything picked up off disk is checked before it is offered for upload.
+      // A take recorded by an older build, or interrupted mid-write, is corrupt
+      // and would only come back as a 415 after a full upload.
+      await preparePending(session);
       if (cancelled) return;
-      setPending({ session, blob });
       if (session.meetingTitle) setTitle(session.meetingTitle);
       setLoadingPending(false);
     })();
@@ -170,6 +175,39 @@ export default function RecordScreen() {
     }
   }
 
+  /**
+   * Assemble a session, prove it is playable, and only then offer it for
+   * upload. Every route into the upload pane goes through here.
+   */
+  async function preparePending(
+    session: RecordingSession,
+    mimeTypeOverride?: string,
+  ): Promise<boolean> {
+    const mimeType = mimeTypeOverride ?? session.mimeType;
+    const assembled = await assembleSessionChecked(session.id, mimeType);
+
+    if (assembled.chunkCount === 0 || assembled.hasGap) {
+      setPending(null);
+      setBadTake({
+        session,
+        reason:
+          "Part of this recording is missing from this device, so it cannot be played back or transcribed.",
+      });
+      return false;
+    }
+
+    const check = await verifyAudioBlob(assembled.blob);
+    if (!check.ok) {
+      setPending(null);
+      setBadTake({ session, reason: check.reason ?? "This audio cannot be read." });
+      return false;
+    }
+
+    setBadTake(null);
+    setPending({ session, blob: assembled.blob });
+    return true;
+  }
+
   /** Stop the take and move it into the upload pane. */
   async function finishRecording() {
     const result = await recorder.stop();
@@ -185,23 +223,7 @@ export default function RecordScreen() {
       return;
     }
 
-    const assembled = await assembleSessionChecked(
-      session.id,
-      result?.mimeType ?? session.mimeType,
-    );
-
-    // Catch a damaged take here rather than after a round trip to Cloudflare
-    // and a 415 from the server. A gap — or a missing chunk 0 — means the
-    // container header or a cluster is absent and nothing can decode it.
-    if (assembled.chunkCount === 0 || assembled.hasGap || result?.incomplete) {
-      setPending(null);
-      setFileError(
-        "Part of this recording did not save to this device, so it cannot be played back or transcribed. Please record it again.",
-      );
-      return;
-    }
-
-    setPending({ session, blob: assembled.blob });
+    await preparePending(session, result?.mimeType);
     setSearch({}, { replace: true });
   }
 
@@ -214,6 +236,11 @@ export default function RecordScreen() {
       setFileError(
         `That file type is not accepted. Allowed: ${ACCEPTED_EXTENSIONS.join(" ")}`,
       );
+      return;
+    }
+    const check = await verifyAudioBlob(file);
+    if (!check.ok) {
+      setFileError(check.reason ?? "That file could not be read as audio.");
       return;
     }
     setPending({
@@ -252,6 +279,47 @@ export default function RecordScreen() {
         <ErrorNotice className="mb-4" message={recorder.error} />
       ) : null}
       {fileError ? <ErrorNotice className="mb-4" message={fileError} /> : null}
+
+      {/* A take that cannot be played back locally will only come back as a 415
+          from the server, so it is stopped here with a way to clear it out. */}
+      {badTake ? (
+        <ErrorNotice
+          className="mb-4"
+          title="This recording is damaged"
+          message={`${badTake.reason} Recordings made before the fix for this cannot be repaired.`}
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={async () => {
+                  await deleteSession(badTake.session.id);
+                  setBadTake(null);
+                  setSearch({}, { replace: true });
+                  toast.success("Damaged recording removed.");
+                }}
+              >
+                <Trash2 className="size-4" />
+                Discard it
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  const assembled = await assembleSessionChecked(
+                    badTake.session.id,
+                    badTake.session.mimeType,
+                  );
+                  setPending({ session: badTake.session, blob: assembled.blob });
+                  setBadTake(null);
+                }}
+              >
+                Try uploading anyway
+              </Button>
+            </div>
+          }
+        />
+      ) : null}
 
       {/* ---------------------------------------------------- upload pane */}
       {pending ? (
