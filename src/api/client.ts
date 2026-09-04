@@ -145,12 +145,12 @@ async function rawFetch(path: string, opts: RequestOptions): Promise<Response> {
   });
 }
 
-/** Fetch a /api/mn route, refreshing the access token at most once on 401. */
-export async function apiFetch<T>(
+/** Sends the request, refreshing the access token at most once on a 401. */
+async function request(
   path: string,
-  opts: RequestOptions = {},
+  opts: RequestOptions,
   retry = true,
-): Promise<T> {
+): Promise<Response> {
   let res: Response;
   try {
     res = await rawFetch(path, opts);
@@ -165,13 +165,47 @@ export async function apiFetch<T>(
     refreshing ??= doRefresh().finally(() => {
       refreshing = null;
     });
-    if (await refreshing) return apiFetch<T>(path, opts, false);
+    if (await refreshing) return request(path, opts, false);
     await forceLogout();
   }
 
   if (!res.ok) throw new ApiError(res.status, await safeJson(res));
+  return res;
+}
+
+/** Fetch a /api/mn route and parse its JSON body. */
+export async function apiFetch<T>(
+  path: string,
+  opts: RequestOptions = {},
+): Promise<T> {
+  const res = await request(path, opts);
   if (res.status === 204) return undefined as T;
   return (await safeJson(res)) as T;
+}
+
+export interface Paged<T> {
+  items: T[];
+  /**
+   * From X-Total-Count. Null when the header is unreadable — which, for a
+   * cross-origin request, also happens when the server sends it but does not
+   * list it in Access-Control-Expose-Headers. Callers fall back to paging by
+   * whether a full page came back.
+   */
+  total: number | null;
+}
+
+/** A list route, plus the total the server reports for the whole collection. */
+export async function apiFetchPaged<T>(
+  path: string,
+  opts: RequestOptions = {},
+): Promise<Paged<T>> {
+  const res = await request(path, opts);
+  const header = res.headers.get("X-Total-Count");
+  const total = header === null ? null : Number.parseInt(header, 10);
+  return {
+    items: ((await safeJson(res)) ?? []) as T[],
+    total: total === null || Number.isNaN(total) ? null : total,
+  };
 }
 
 async function safeJson(res: Response): Promise<unknown> {

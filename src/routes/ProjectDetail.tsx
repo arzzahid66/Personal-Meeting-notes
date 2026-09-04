@@ -113,9 +113,9 @@ export default function ProjectDetailScreen() {
 
           {meetings.isPending ? (
             <Skeleton className="h-16 w-full" />
-          ) : meetings.data && meetings.data.length > 0 ? (
+          ) : meetings.data && meetings.data.items.length > 0 ? (
             <ul className="space-y-2">
-              {meetings.data.map((meeting) => (
+              {meetings.data.items.map((meeting) => (
                 <li key={meeting.id}>
                   <Card className="transition-colors hover:border-primary/40">
                     <Link

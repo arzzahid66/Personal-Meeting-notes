@@ -52,6 +52,16 @@ export function useProject(id: UUID | undefined) {
   });
 }
 
+/** Distinct assignees on a project's tasks, for the task filter picker. */
+export function useAssignees(projectId: UUID | undefined) {
+  return useQuery({
+    queryKey: ["assignees", projectId ?? ""],
+    queryFn: () => projectsApi.assignees(projectId as UUID),
+    enabled: Boolean(projectId),
+    staleTime: 60_000,
+  });
+}
+
 export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation<Project, Error, ProjectCreate>({

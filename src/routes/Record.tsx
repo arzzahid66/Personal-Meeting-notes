@@ -407,22 +407,53 @@ export default function RecordScreen() {
                         {/* The browser already proved this audio is playable, so
                             if the server cannot read it, what it stored is the
                             thing to look at. */}
-                        {upload.diagnostics ? (
+                        {upload.diagnostics || upload.serverDiagnostic ? (
                           <details className="text-xs">
                             <summary className="cursor-pointer text-muted-foreground">
                               Upload details
                             </summary>
                             <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 font-mono">
-                              <dt className="text-muted-foreground">stored as</dt>
-                              <dd className="break-all">{upload.diagnostics.key}</dd>
-                              <dt className="text-muted-foreground">signed type</dt>
-                              <dd>{upload.diagnostics.contentType}</dd>
-                              <dt className="text-muted-foreground">sent type</dt>
-                              <dd>{upload.diagnostics.sentMimeType}</dd>
-                              <dt className="text-muted-foreground">filename</dt>
-                              <dd>{upload.diagnostics.filename}</dd>
-                              <dt className="text-muted-foreground">bytes</dt>
-                              <dd>{upload.diagnostics.bytes.toLocaleString()}</dd>
+                              {/* The server's account of what it actually saw
+                                  comes first — it is the authoritative one. */}
+                              {upload.serverDiagnostic
+                                ? Object.entries(upload.serverDiagnostic).map(
+                                    ([key, value]) => (
+                                      <React.Fragment key={key}>
+                                        <dt className="text-muted-foreground">
+                                          {key.replace(/_/g, " ")}
+                                        </dt>
+                                        <dd className="break-all">
+                                          {value === null || value === undefined
+                                            ? "null"
+                                            : typeof value === "object"
+                                              ? JSON.stringify(value)
+                                              : String(value)}
+                                        </dd>
+                                      </React.Fragment>
+                                    ),
+                                  )
+                                : null}
+                              {/* Only what the server did not already say.
+                                  The recorded type is always ours to report:
+                                  it is the one fact from before the upload. */}
+                              {upload.diagnostics ? (
+                                <>
+                                  {upload.serverDiagnostic ? null : (
+                                    <>
+                                      <dt className="text-muted-foreground">stored as</dt>
+                                      <dd className="break-all">
+                                        {upload.diagnostics.key}
+                                      </dd>
+                                      <dt className="text-muted-foreground">signed type</dt>
+                                      <dd>{upload.diagnostics.contentType}</dd>
+                                      <dt className="text-muted-foreground">bytes</dt>
+                                      <dd>{upload.diagnostics.bytes.toLocaleString()}</dd>
+                                    </>
+                                  )}
+                                  <dt className="text-muted-foreground">recorded as</dt>
+                                  <dd>{upload.diagnostics.sentMimeType}</dd>
+                                </>
+                              ) : null}
                             </dl>
                           </details>
                         ) : null}

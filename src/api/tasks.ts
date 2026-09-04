@@ -1,15 +1,16 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiFetchPaged, type Paged } from "./client";
 import type { Task, TaskCreate, TaskListParams, TaskUpdate, UUID } from "./types";
 
 export const tasksApi = {
-  list(params: TaskListParams = {}) {
-    return apiFetch<Task[]>("/tasks", {
+  list(params: TaskListParams = {}): Promise<Paged<Task>> {
+    return apiFetchPaged<Task>("/tasks", {
       query: {
         project_id: params.project_id,
         meeting_id: params.meeting_id,
         status: params.status,
         severity: params.severity,
         task_type: params.task_type,
+        assignee: params.assignee,
         due_before: params.due_before,
         overdue: params.overdue ? true : undefined,
         limit: params.limit ?? 100,

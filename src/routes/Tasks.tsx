@@ -7,7 +7,7 @@ import type {
   TaskStatus,
   TaskType,
 } from "@/api/types";
-import { useCreateTask, useProjects, useTasks } from "@/hooks/queries";
+import { useAssignees, useCreateTask, useProjects, useTasks } from "@/hooks/queries";
 import { PageHeader } from "@/components/AppShell";
 import { TaskCard } from "@/components/TaskCard";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ export default function TasksScreen() {
   const [showFilters, setShowFilters] = React.useState(false);
 
   const tasks = useTasks(filters);
+  const assignees = useAssignees(filters.project_id);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const set = (patch: Partial<TaskListParams>) =>
@@ -131,6 +132,21 @@ export default function TasksScreen() {
               }
               options={TYPE_OPTIONS}
             />
+            <SimpleSelect
+              value={filters.assignee ?? ""}
+              onChange={(value) => set({ assignee: value || undefined })}
+              options={[
+                { value: "", label: "Anyone" },
+                { value: "unassigned", label: "Unassigned" },
+                ...(assignees.data?.assignees ?? []).map((name) => ({
+                  value: name,
+                  label: name,
+                })),
+              ]}
+              placeholder={
+                filters.project_id ? "Anyone" : "Anyone — pick a project for names"
+              }
+            />
             <Field label="Due on or before" htmlFor="due-before">
               <Input
                 id="due-before"
@@ -161,7 +177,7 @@ export default function TasksScreen() {
         </div>
       ) : tasks.isError ? (
         <ErrorNotice message={(tasks.error as Error).message} />
-      ) : tasks.data.length === 0 ? (
+      ) : tasks.data.items.length === 0 ? (
         <EmptyState
           icon={CheckSquare}
           title={activeFilterCount > 0 ? "Nothing matches those filters" : "No tasks yet"}
@@ -172,13 +188,20 @@ export default function TasksScreen() {
           }
         />
       ) : (
+        <>
+          {tasks.data.total !== null ? (
+            <p className="mb-2 text-xs text-muted-foreground">
+              Showing {tasks.data.items.length} of {tasks.data.total}
+            </p>
+          ) : null}
         <ul className="space-y-2">
-          {tasks.data.map((task) => (
+          {tasks.data.items.map((task) => (
             <li key={task.id}>
               <TaskCard task={task} />
             </li>
           ))}
         </ul>
+        </>
       )}
     </>
   );

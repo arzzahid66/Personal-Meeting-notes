@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiFetchPaged, type Paged } from "./client";
 import type {
   AudioUrlResponse,
   Meeting,
@@ -12,8 +12,8 @@ import type {
 } from "./types";
 
 export const meetingsApi = {
-  list(params: MeetingListParams = {}) {
-    return apiFetch<Meeting[]>("/meetings", {
+  list(params: MeetingListParams = {}): Promise<Paged<Meeting>> {
+    return apiFetchPaged<Meeting>("/meetings", {
       query: {
         project_id: params.project_id,
         limit: params.limit ?? 50,

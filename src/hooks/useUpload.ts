@@ -22,6 +22,12 @@ export interface UploadState {
   corsBlocked: boolean;
   /** Present once a presign has come back, on success or failure. */
   diagnostics: UploadDiagnostics | null;
+  /**
+   * The server's own `diagnostic` object from a 415 — what ffprobe saw. This is
+   * the authoritative account of why an upload was refused, so it is shown
+   * verbatim rather than summarised.
+   */
+  serverDiagnostic: Record<string, unknown> | null;
 }
 
 const initial: UploadState = {
@@ -30,6 +36,7 @@ const initial: UploadState = {
   error: null,
   corsBlocked: false,
   diagnostics: null,
+  serverDiagnostic: null,
 };
 
 export function useUpload() {
@@ -69,10 +76,16 @@ export function useUpload() {
         return meeting;
       } catch (err) {
         const corsBlocked = err instanceof UploadError && err.kind === "cors";
+        const body = err instanceof ApiError ? (err.body as { diagnostic?: unknown }) : null;
+        const serverDiagnostic =
+          body?.diagnostic && typeof body.diagnostic === "object"
+            ? (body.diagnostic as Record<string, unknown>)
+            : null;
         setState({
           busy: false,
           progress: null,
           diagnostics,
+          serverDiagnostic,
           corsBlocked,
           error:
             err instanceof UploadError || err instanceof ApiError

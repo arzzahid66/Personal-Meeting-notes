@@ -24,6 +24,16 @@ export default function MeetingsScreen() {
     offset,
   });
 
+  // X-Total-Count gives an exact answer; without it, fall back to inferring
+  // from whether the page came back full.
+  const page = meetings.data;
+  const hasMore =
+    page === undefined
+      ? false
+      : page.total !== null
+        ? offset + page.items.length < page.total
+        : page.items.length === PAGE_SIZE;
+
   const projectOptions = React.useMemo(
     () => [
       { value: "", label: "All projects" },
@@ -74,7 +84,7 @@ export default function MeetingsScreen() {
             </Button>
           }
         />
-      ) : meetings.data.length === 0 ? (
+      ) : meetings.data.items.length === 0 ? (
         <EmptyState
           icon={CalendarDays}
           title="No meetings yet"
@@ -88,7 +98,7 @@ export default function MeetingsScreen() {
       ) : (
         <>
           <ul className="space-y-2">
-            {meetings.data.map((meeting) => (
+            {meetings.data.items.map((meeting) => (
               <li key={meeting.id}>
                 <Card className="transition-colors hover:border-primary/40">
                   <Link
@@ -117,7 +127,7 @@ export default function MeetingsScreen() {
             ))}
           </ul>
 
-          {(offset > 0 || meetings.data.length === PAGE_SIZE) && (
+          {(offset > 0 || hasMore) && (
             <div className="mt-4 flex items-center justify-between">
               <Button
                 variant="outline"
@@ -128,12 +138,13 @@ export default function MeetingsScreen() {
                 Previous
               </Button>
               <span className="text-xs text-muted-foreground">
-                {offset + 1}–{offset + meetings.data.length}
+                {offset + 1}–{offset + meetings.data.items.length}
+                {meetings.data.total !== null ? ` of ${meetings.data.total}` : ""}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={meetings.data.length < PAGE_SIZE}
+                disabled={!hasMore}
                 onClick={() => setOffset((o) => o + PAGE_SIZE)}
               >
                 Next

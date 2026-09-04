@@ -238,6 +238,8 @@ export interface TaskListParams {
   task_type?: TaskType;
   due_before?: string;
   overdue?: boolean;
+  /** Matched case- and whitespace-insensitively; "unassigned" for nobody. */
+  assignee?: string;
   limit?: number; // 1-500, default 100
   offset?: number;
 }

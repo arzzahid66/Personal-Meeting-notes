@@ -20,6 +20,11 @@ export const projectsApi = {
     return apiFetch<Project>(`/projects/${id}`, { method: "PATCH", body });
   },
 
+  /** Distinct assignee names across the project's tasks, for a picker. */
+  assignees(id: UUID) {
+    return apiFetch<{ assignees: string[] }>(`/projects/${id}/assignees`);
+  },
+
   /** Cascades to every meeting and task in the project. */
   remove(id: UUID) {
     return apiFetch<void>(`/projects/${id}`, { method: "DELETE" });
