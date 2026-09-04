@@ -132,14 +132,10 @@ export const TASK_STATUS_ORDER: TaskStatus[] = [
   "cancelled",
 ];
 
-/** The inline toggle on the task list cycles open → in progress → done. */
-export function nextTaskStatus(status: TaskStatus): TaskStatus {
-  switch (status) {
-    case "open":
-      return "in_progress";
-    case "in_progress":
-      return "done";
-    default:
-      return "open";
-  }
-}
+/** Status is shown as a named chip, so each state needs its own tone. */
+export const STATUS_CLASS: Record<TaskStatus, string> = {
+  open: "bg-muted text-muted-foreground",
+  in_progress: "bg-primary/12 text-primary",
+  done: "bg-success/15 text-success",
+  cancelled: "bg-muted text-muted-foreground line-through",
+};
