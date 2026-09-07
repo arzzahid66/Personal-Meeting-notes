@@ -15,12 +15,12 @@ import type { OutputLanguage, UUID } from "@/api/types";
 import { useAuth } from "@/hooks/auth";
 import { useCreateMeeting, useProjects } from "@/hooks/queries";
 import { useLiveTranscription } from "@/hooks/useLiveTranscription";
-import { AUTO_EXTRACT_MS, useTaskExtraction } from "@/hooks/useTaskExtraction";
+import { useTaskExtraction } from "@/hooks/useTaskExtraction";
 import { PageHeader } from "@/components/AppShell";
 import { ExtractedTaskCard } from "@/components/ExtractedTaskCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Field, Input } from "@/components/ui/input";
+import { Field, Input, Textarea } from "@/components/ui/input";
 import { SimpleSelect } from "@/components/ui/select";
 import { EmptyState, ErrorNotice } from "@/components/ui/misc";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,8 @@ export default function LiveScreen() {
   const [taskLanguage, setTaskLanguage] = React.useState<OutputLanguage | "">("");
   const [starting, setStarting] = React.useState(false);
   const [finishing, setFinishing] = React.useState(false);
+  /** The finished transcript, editable before it is turned into tasks. */
+  const [finalTranscript, setFinalTranscript] = React.useState("");
 
   const transcriptBox = React.useRef<HTMLDivElement>(null);
 
@@ -59,19 +61,6 @@ export default function LiveScreen() {
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     if (atBottom) el.scrollTop = el.scrollHeight;
   }, [live.finalText, live.interimText]);
-
-  // Extraction runs on a long timer, never on transcript updates: every call
-  // costs at least six seconds and re-reading old text duplicates tasks.
-  React.useEffect(() => {
-    if (!live.isActive || !meetingId) return;
-    const id = window.setInterval(() => {
-      void extraction.run(live.transcript, {
-        outputLanguage: taskLanguage || null,
-      });
-    }, AUTO_EXTRACT_MS);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live.isActive, meetingId, taskLanguage]);
 
   if (!keysReady) {
     return (
@@ -114,6 +103,7 @@ export default function LiveScreen() {
         setMeetingId(id);
       }
       extraction.reset();
+      setFinalTranscript("");
       await live.start(language);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start.");
@@ -126,25 +116,22 @@ export default function LiveScreen() {
     setFinishing(true);
     try {
       const transcript = await live.stop();
+      setFinalTranscript(transcript);
       if (transcript && meetingId) {
-        // One clean sweep over everything said, replacing whatever the
-        // incremental runs left behind.
+        // The whole meeting in one pass, now that there is a whole meeting.
         const count = await extraction.run(transcript, {
-          final: true,
           outputLanguage: taskLanguage || null,
         });
         toast.success(
           count > 0
-            ? `Meeting finished — ${count} task${count === 1 ? "" : "s"} saved.`
-            : "Meeting finished.",
+            ? `${count} task${count === 1 ? "" : "s"} found.`
+            : "Meeting finished — nothing that looked like a task.",
         );
       }
     } finally {
       setFinishing(false);
     }
   }
-
-  const pending = extraction.pendingChars(live.transcript);
 
   return (
     <>
@@ -164,7 +151,7 @@ export default function LiveScreen() {
               ) : null}
             </div>
           ) : (
-            "Transcribes as you speak, and finds tasks while the meeting runs."
+            "Transcribes as you speak. Tasks are pulled out of the transcript when you stop."
           )
         }
       />
@@ -258,7 +245,7 @@ export default function LiveScreen() {
         ) : null}
 
         {/* -------------------------------------------------- transcript */}
-        {live.isActive || live.finalText ? (
+        {live.isActive || finalTranscript ? (
           <Card>
             <CardContent className="space-y-2 pt-4">
               <div className="flex items-center justify-between">
@@ -272,24 +259,36 @@ export default function LiveScreen() {
                   </span>
                 ) : null}
               </div>
-              <div
-                ref={transcriptBox}
-                className="max-h-72 overflow-y-auto rounded-lg bg-muted/40 p-3 text-sm leading-relaxed"
-              >
-                {live.finalText || live.interimText ? (
-                  <p dir="auto">
-                    {live.finalText}
-                    {/* Interim text is provisional and will be rewritten. */}
-                    {live.interimText ? (
-                      <span className="italic text-muted-foreground">
-                        {live.interimText}
-                      </span>
-                    ) : null}
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">Listening…</p>
-                )}
-              </div>
+              {live.isActive ? (
+                <div
+                  ref={transcriptBox}
+                  className="max-h-72 overflow-y-auto rounded-lg bg-muted/40 p-3 text-sm leading-relaxed"
+                >
+                  {live.finalText || live.interimText ? (
+                    <p dir="auto">
+                      {live.finalText}
+                      {/* Interim text is provisional and will be rewritten. */}
+                      {live.interimText ? (
+                        <span className="italic text-muted-foreground">
+                          {live.interimText}
+                        </span>
+                      ) : null}
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">Listening…</p>
+                  )}
+                </div>
+              ) : (
+                // Once the meeting ends the transcript becomes editable: this
+                // is the moment to fix a misheard name or term, before it is
+                // read for tasks.
+                <Textarea
+                  className="min-h-40 max-h-96 bg-muted/40 text-sm leading-relaxed"
+                  value={finalTranscript}
+                  onChange={(e) => setFinalTranscript(e.target.value)}
+                  dir="auto"
+                />
+              )}
             </CardContent>
           </Card>
         ) : null}
@@ -306,28 +305,41 @@ export default function LiveScreen() {
                 onClick={onStop}
               >
                 <CircleStop className="size-5" />
-                Stop and save tasks
+                Stop and generate tasks
               </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                Nothing is sent for analysis while you talk. Tasks are pulled out
+                of the whole transcript when you stop.
+              </p>
+            </>
+          ) : finalTranscript ? (
+            <>
+              {/* The transcript can be corrected and read again — an edit should
+                  be able to fix a task that came from a misheard word. */}
               <Button
-                variant="outline"
+                size="lg"
                 className="w-full"
                 loading={extraction.busy}
-                disabled={pending === 0}
                 onClick={() =>
-                  extraction.run(live.transcript, {
+                  extraction.run(finalTranscript, {
                     outputLanguage: taskLanguage || null,
                   })
                 }
               >
-                <Sparkles className="size-4" />
-                {pending === 0
-                  ? "Nothing new to scan"
-                  : `Find tasks in what was just said`}
+                <Sparkles className="size-5" />
+                {extraction.hasRun ? "Generate again from this text" : "Generate tasks"}
               </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                Runs automatically every {AUTO_EXTRACT_MS / 60_000} minutes.
-                {extraction.busy ? " Scanning now…" : ""}
-              </p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setFinalTranscript("");
+                  extraction.reset();
+                }}
+              >
+                <Radio className="size-4" />
+                Start a new recording
+              </Button>
             </>
           ) : (
             <Button
@@ -364,11 +376,11 @@ export default function LiveScreen() {
           {extraction.tasks.length === 0 ? (
             <EmptyState
               icon={Sparkles}
-              title={live.isActive ? "Listening for tasks" : "No tasks yet"}
+              title={live.isActive ? "Still listening" : "No tasks yet"}
               description={
                 live.isActive
-                  ? "Anything that sounds like a task will appear here as the meeting goes on."
-                  : "Start listening, and tasks are pulled out of the conversation as it happens."
+                  ? "Tasks are found once you stop, from the whole transcript at once."
+                  : "Record a meeting, then its transcript is read for tasks."
               }
             />
           ) : (
