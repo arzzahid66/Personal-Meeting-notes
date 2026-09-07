@@ -175,3 +175,17 @@
     animation: none;
   }
 }
+
+/* Task cards arriving mid-meeting: a brief settle so new ones are noticed. */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: card-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in { animation: none; }
+}

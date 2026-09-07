@@ -32,8 +32,10 @@ export function RecoveryPrompt() {
 
   return (
     <>
-      <div className="fixed inset-x-0 bottom-20 z-40 mx-auto max-w-3xl px-4">
-        <div className="flex items-center gap-3 rounded-xl border border-warning/40 bg-card p-3 shadow-lg">
+      {/* In the flow, not floating: a bar pinned over the page covers whatever
+          scrolls beneath it, and on these screens that is the main action. */}
+      <div className="border-b border-warning/40 bg-warning/10">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-2">
           <AlertTriangle className="size-5 shrink-0 text-warning" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium" dir="auto">
@@ -46,6 +48,7 @@ export function RecoveryPrompt() {
           </div>
           <Button
             size="sm"
+            variant="outline"
             onClick={() => navigate(`/record?resume=${session.id}`)}
           >
             Upload

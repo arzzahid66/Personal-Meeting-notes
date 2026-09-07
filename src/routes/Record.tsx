@@ -6,6 +6,7 @@ import {
   Mic,
   Pause,
   Play,
+  Radio,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -274,6 +275,26 @@ export default function RecordScreen() {
             : `Up to ${MAX_DURATION_MIN} minutes per recording.`
         }
       />
+
+      {!busyRecording && !pending ? (
+        <Card className="mb-4 border-primary/30">
+          <CardContent className="flex items-center justify-between gap-3 pt-4">
+            <div className="min-w-0">
+              <p className="font-medium">Transcribe live instead</p>
+              <p className="text-sm text-muted-foreground">
+                See the transcript as you speak, and get tasks during the meeting
+                rather than after it.
+              </p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link to={meetingParam ? `/live?meeting=${meetingParam}` : "/live"}>
+                <Radio className="size-4" />
+                Live
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {recorder.error ? (
         <ErrorNotice className="mb-4" message={recorder.error} />

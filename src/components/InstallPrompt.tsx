@@ -10,9 +10,14 @@ const DISMISS_KEY = "mn-install-dismissed";
  * Installing matters here: a standalone window keeps recordings out of a tab
  * the OS is free to discard, and gives the recorder the whole screen.
  *
- * Rendered above the router rather than inside the app shell, so it is offered
- * on the login screen too — that is the first thing a new user sees, and the
- * moment they are most likely to want the app on their home screen.
+ * It sits in the document flow at the top rather than floating above the page.
+ * A bar pinned over the bottom of a scrollable screen will eventually cover
+ * whatever happens to scroll under it — which, on the recording screens, is the
+ * primary button.
+ *
+ * Rendered above the router so it also reaches the login screen: that is the
+ * first thing a new user sees, and the moment they would want this on their
+ * home screen.
  */
 export function InstallPrompt() {
   const { canPrompt, standalone, promptInstall } = useInstall();
@@ -39,14 +44,15 @@ export function InstallPrompt() {
 
   return (
     <>
-      <div className="fixed inset-x-0 bottom-20 z-40 mx-auto max-w-3xl px-4">
-        <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-lg">
-          <Download className="size-5 shrink-0 text-primary" />
+      <div className="border-b bg-accent/60">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-2">
+          <Download className="size-4 shrink-0 text-primary" />
           <p className="min-w-0 flex-1 text-sm">
             Install Meeting Notes for offline recording.
           </p>
           <Button
             size="sm"
+            variant="outline"
             onClick={async () => {
               // One tap where the browser allows it; instructions where it does not.
               if (canPrompt) {

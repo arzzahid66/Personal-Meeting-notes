@@ -244,6 +244,56 @@ export interface TaskListParams {
   offset?: number;
 }
 
+/* ----------------------------------------------- live transcription --- */
+
+/** GET /deepgram-token — short-lived, never cached or reused across sockets. */
+export interface DeepgramToken {
+  access_token: string;
+  /** Seconds. 300 at time of writing, so a long meeting outlives it. */
+  expires_in: number;
+}
+
+/**
+ * The extractor's own type vocabulary. It overlaps the task board's but is not
+ * identical — it has "question" where the board has "followup" — so it is kept
+ * separate rather than assumed equal.
+ */
+export type ExtractedTaskType =
+  | "bug"
+  | "task"
+  | "feature"
+  | "improvement"
+  | "question";
+
+export interface ExtractedTask {
+  /** Null when persist was false: a preview task was never written. */
+  id: UUID | null;
+  title: string;
+  short_description: string;
+  description: string;
+  type: ExtractedTaskType;
+  severity: Severity;
+  assignee: string | null;
+  /** Verbatim from the transcript, never translated. The evidence. */
+  source_quote: string | null;
+}
+
+export interface ExtractRequest {
+  transcript: string;
+  /** False previews without writing anything. */
+  persist?: boolean;
+  /** True wipes this meeting's tasks first — only for the final sweep. */
+  replace_existing?: boolean;
+  output_language?: OutputLanguage | null;
+}
+
+export interface ExtractResponse {
+  meeting_id: UUID;
+  persisted: boolean;
+  count: number;
+  tasks: ExtractedTask[];
+}
+
 /* ------------------------------------------------------------ settings --- */
 
 export interface Settings {

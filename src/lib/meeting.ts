@@ -111,6 +111,18 @@ export const TASK_TYPE_LABEL: Record<TaskType, string> = {
   followup: "Follow-up",
 };
 
+/**
+ * The extractor speaks a slightly different vocabulary from the task board — it
+ * returns "question" where the board has "followup" — and either side may gain
+ * a value before the other. Unknown values are humanised rather than rendered
+ * as "undefined".
+ */
+export function taskTypeLabel(type: string): string {
+  if (type in TASK_TYPE_LABEL) return TASK_TYPE_LABEL[type as TaskType];
+  if (type === "question") return "Question";
+  return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, " ");
+}
+
 export const SEVERITY_LABEL: Record<Severity, string> = {
   low: "Low",
   medium: "Medium",
