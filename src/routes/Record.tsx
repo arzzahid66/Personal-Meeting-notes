@@ -282,14 +282,14 @@ export default function RecordScreen() {
             <div className="min-w-0">
               <p className="font-medium">Transcribe live instead</p>
               <p className="text-sm text-muted-foreground">
-                See the transcript as you speak, and get tasks during the meeting
-                rather than after it.
+                Watch the words appear as you speak. No file to upload, and the
+                tasks are ready the moment you stop.
               </p>
             </div>
             <Button asChild variant="outline" size="sm" className="shrink-0">
               <Link to={meetingParam ? `/live?meeting=${meetingParam}` : "/live"}>
                 <Radio className="size-4" />
-                Live
+                Transcribe live
               </Link>
             </Button>
           </CardContent>

@@ -9,7 +9,7 @@ export const MEETING_STAGES: Record<
     label: "Waiting for audio",
     percent: 0,
     busy: false,
-    hint: "No audio yet. Record or upload a file to start.",
+    hint: "Nothing captured yet. Transcribe live, record, upload a file, or paste a transcript.",
   },
   uploaded: {
     label: "Queued",

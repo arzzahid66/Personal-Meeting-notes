@@ -7,6 +7,7 @@ import {
   Mic,
   NotebookPen,
   Pencil,
+  Radio,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -352,7 +353,7 @@ function AudioSourcePanel({ meeting }: { meeting: MeetingDetail }) {
   return (
     <Card>
       <CardContent className="space-y-3 pt-5">
-        <p className="text-sm font-medium">Add audio</p>
+        <p className="text-sm font-medium">Capture this meeting</p>
 
         {fileError ? <ErrorNotice message={fileError} /> : null}
         {upload.error ? (
@@ -395,16 +396,25 @@ function AudioSourcePanel({ meeting }: { meeting: MeetingDetail }) {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button asChild className="flex-1">
+          // All four ways in, side by side. Live transcription was reachable
+          // only from the Record screen before, which is the one place someone
+          // adding audio to an existing meeting never looks.
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button asChild className="w-full justify-start">
+              <Link to={`/live?meeting=${meeting.id}`}>
+                <Radio className="size-4" />
+                Transcribe live
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-start">
               <Link to={`/record?meeting=${meeting.id}`}>
                 <Mic className="size-4" />
-                Record now
+                Record and upload
               </Link>
             </Button>
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full justify-start"
               onClick={() => fileInput.current?.click()}
             >
               <Upload className="size-4" />
@@ -612,7 +622,7 @@ function PasteTranscriptDialog({
         <Button
           variant="outline"
           size={replacing ? "sm" : "default"}
-          className={replacing ? undefined : "flex-1"}
+          className={replacing ? undefined : "w-full justify-start"}
         >
           {replacing ? <Pencil className="size-4" /> : <FileText className="size-4" />}
           {replacing ? "Replace transcript" : "Paste a transcript"}
